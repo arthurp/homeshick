@@ -22,11 +22,16 @@ function symlink {
 		local repopath="$repo/home/$relpath"
 		local homepath="$HOME/$relpath"
 		local rel_repopath
+		local file_processor
 		rel_repopath=$(create_rel_path "$(dirname "$homepath")/" "$repopath") || return $?
+		file_processor=$(get_file_processor "$repopath")
 
 		if [[ -e $homepath || -L $homepath ]]; then
 			# $homepath exists (but may be a dead symlink)
-			if [[ -L $homepath && $(readlink "$homepath") == "$rel_repopath" ]]; then
+			if [[ -n "$file_processor" ]]; then
+				# We are using a file processor so always regenerate and replace.
+				rm "$homepath"
+			elif [[ -L $homepath && $(readlink "$homepath") == "$rel_repopath" ]]; then
 				# $homepath symlinks to $repopath.
 				if $VERBOSE; then
 					ignore 'identical' "$relpath"
@@ -65,8 +70,19 @@ function symlink {
 
 		if [[ ! -d $repopath || -L $repopath ]]; then
 			# $repopath is not a real directory so we create a symlink to it
-			pending 'symlink' "$relpath"
-			ln -s "$rel_repopath" "$homepath"
+			if [[ -z "$file_processor" ]]; then
+				pending 'symlink' "$relpath"
+				ln -s "$rel_repopath" "$homepath"
+			else
+				pending 'processor' "$homepath"
+				(
+					cd "$(dirname "$homepath")"
+					export HOMESHICK_REPO="$repo"
+					export HOMESHICK_TARGET="$homepath"
+					export HOMESHICK_SOURCE="$repopath"
+					$file_processor | replace_file_processor "DO NOT EDIT! Automatically generated from '$repopath' by homeshick using '$file_processor'."
+				) < "$repopath" > "$homepath"
+			fi
 		else
 			pending 'directory' "$relpath"
 			mkdir "$homepath"
@@ -76,6 +92,21 @@ function symlink {
 	# Fetch the repo files and redirect the output into file descriptor 3
 	done 3< <(get_repo_files "$repo")
 	return "$EX_SUCCESS"
+}
+
+# Extract the processor command from the magic text in the file if available.
+function get_file_processor {
+	local path="$1"
+	if [[ -f "$path" ]]; then
+		sed -n -e 's/^.*[[:space:]]homeshick-processor:[[:space:]]\+"\(.*\)".*$/\1/p;s/^.*[[:space:]]homeshick-processor:[[:space:]]\+\([^;]*\);\?.*$/\1/p;16q' < "$path"
+	fi
+}
+
+# Replace any processor command magic line with some text.
+# This is used to inject and "AUTO GENERATED" warning to the generated files.
+function replace_file_processor {
+	local replacement="$1"
+	sed  -e 's~homeshick-processor:[[:space:]]\+\(".*"\|[^;]*;\?\).*$~'"$replacement"'~'
 }
 
 # Fetches all files and folders in a repository that are tracked by git
