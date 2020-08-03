@@ -98,7 +98,7 @@ function symlink {
 function get_file_processor {
 	local path="$1"
 	if [[ -f "$path" ]]; then
-		sed -n -e 's/^.*[[:space:]]homeshick-processor:[[:space:]]\+"\(.*\)".*$/\1/p;s/^.*[[:space:]]homeshick-processor:[[:space:]]\+\([^;]*\);\?.*$/\1/p;16q' < "$path"
+		sed -n -e 's/^.*[[:space:]]homeshick-processor:[[:space:]]\{1,\}"\(.*\)".*$/\1/p;s/^.*[[:space:]]homeshick-processor:[[:space:]]\{1,\}\([^;]*\);\{0,1\}.*$/\1/p;16q' < "$path"
 	fi
 }
 
@@ -106,7 +106,7 @@ function get_file_processor {
 # This is used to inject and "AUTO GENERATED" warning to the generated files.
 function replace_file_processor {
 	local replacement="$1"
-	sed  -e 's~homeshick-processor:[[:space:]]\+\(".*"\|[^;]*;\?\).*$~'"$replacement"'~'
+	sed  -e 's~homeshick-processor:[[:space:]]\{1,\}".*".*$~'"$replacement"'~;s~homeshick-processor:[[:space:]]\{1,\}[^;]*;\{0,1\}.*$~'"$replacement"'~'
 }
 
 # Fetches all files and folders in a repository that are tracked by git
