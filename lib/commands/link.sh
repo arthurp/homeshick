@@ -25,8 +25,10 @@ function symlink {
 		local file_processor
 		rel_repopath=$(create_rel_path "$(dirname "$homepath")/" "$repopath") || return $?
 		file_processor=$(get_file_processor "$repopath")
+		original_perms=""
 
 		if [[ -e $homepath || -L $homepath ]]; then
+			original_perms=$(stat -c '%a' $homepath)
 			# $homepath exists (but may be a dead symlink)
 			if [[ -n "$file_processor" ]]; then
 				# We are using a file processor so always regenerate and replace.
@@ -83,6 +85,9 @@ function symlink {
 					$file_processor | replace_file_processor "DO NOT EDIT! Automatically generated from '$repopath' by homeshick using '$file_processor'."
 				) < "$repopath" > "$homepath"
 			fi
+                        if [[ -n "$original_perms" ]]; then
+				chmod $original_perms "$homepath"
+                        fi
 		else
 			pending 'directory' "$relpath"
 			mkdir "$homepath"
